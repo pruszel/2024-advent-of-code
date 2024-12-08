@@ -15,8 +15,13 @@ class Day6:
             coordinates_before_next_obstacle = \
                 self.coordinates_before_next_obstacle(
                     guard_coordinates, guard_direction)
-            self.record_visited_coordinates(guard_coordinates,
-                                            coordinates_before_next_obstacle)
+
+            self.visited_coordinates.add(guard_coordinates)
+            coordinates_between = self.coordinates_between_two_points(guard_coordinates,
+                                                                      coordinates_before_next_obstacle)
+            self.visited_coordinates.update(coordinates_between)
+            self.visited_coordinates.add(coordinates_before_next_obstacle)
+
             guard_coordinates = coordinates_before_next_obstacle
             new_guard_direction = self.turn_guard_right(guard_direction)
 
@@ -31,20 +36,19 @@ class Day6:
                     print(self.map_data[y][x], end='')
             print()
 
-    def record_visited_coordinates(self, guard_coordinates: tuple[int, int], coordinates_before_next_obstacle: tuple[int, int]) -> None:
-        x_offset = coordinates_before_next_obstacle[0] - guard_coordinates[0]
-        y_offset = coordinates_before_next_obstacle[1] - guard_coordinates[1]
+    def coordinates_between_two_points(self, pointA: tuple[int, int], pointB: tuple[int, int]) -> None:
+        coordinates: set[tuple[int, int]] = set()
+        x_offset = pointB[0] - pointA[0]
+        y_offset = pointB[1] - pointA[1]
         x_increment = 0 if x_offset == 0 else x_offset // abs(x_offset)
         y_increment = 0 if y_offset == 0 else y_offset // abs(y_offset)
 
-        self.visited_coordinates.add(guard_coordinates)
-
         for i in range(1, abs(x_offset) + abs(y_offset)):
-            x = guard_coordinates[0] + x_increment * i
-            y = guard_coordinates[1] + y_increment * i
-            self.visited_coordinates.add((x, y))
+            x = pointA[0] + x_increment * i
+            y = pointA[1] + y_increment * i
+            coordinates.add((x, y))
 
-        self.visited_coordinates.add(coordinates_before_next_obstacle)
+        return coordinates
 
     def turn_guard_right(self, guard_direction: str) -> str:
         """
@@ -144,7 +148,93 @@ class Day6:
 
     def part2_answer(self) -> int:
         answer: int = 0
+        self.obstacle_coordinates_tried: set[tuple[int, int]] = set()
+        guard_coordinates, guard_direction = self.guard_coordinates_and_direction()
+        # helps with checking if the guard is finished before turning the guard
+        new_guard_direction: str = guard_direction
+
+        while not self.is_guard_leaving_map(guard_coordinates, guard_direction):
+            guard_direction = new_guard_direction
+            coordinates_before_next_obstacle = \
+                self.coordinates_before_next_obstacle(
+                    guard_coordinates, guard_direction)
+
+            answer += self.num_loops_between_guard_and_obstacle(
+                guard_coordinates, coordinates_before_next_obstacle)
+
+            guard_coordinates = coordinates_before_next_obstacle
+            new_guard_direction = self.turn_guard_right(guard_direction)
+
         return answer
+
+    def num_loops_between_guard_and_obstacle(self, guard_coordinates: tuple[int, int], coordinates_before_next_obstacle: tuple[int, int]) -> int:
+        result: int = 0
+        x_offset = coordinates_before_next_obstacle[0] - guard_coordinates[0]
+        y_offset = coordinates_before_next_obstacle[1] - guard_coordinates[1]
+        x_increment = 0 if x_offset == 0 else x_offset // abs(x_offset)
+        y_increment = 0 if y_offset == 0 else y_offset // abs(y_offset)
+
+        # place obstacle on each coordinate between the guard and the obstacle
+        for i in range(1, abs(x_offset) + abs(y_offset) + 1):
+            obstacle_coordinates: tuple[int, int] = guard_coordinates[0] + \
+                x_increment * i, guard_coordinates[1] + y_increment * i
+
+            # check if guard cannot leave the map
+            if obstacle_coordinates not in self.obstacle_coordinates_tried and \
+                    not self.can_guard_leave_map(obstacle_coordinates):
+                result += 1
+
+            self.obstacle_coordinates_tried.add(obstacle_coordinates)
+
+        return result
+
+    def can_guard_leave_map(self, obstacle_coordinates: tuple[int, int]) -> bool:
+        can_leave: bool = True
+        visited_coordinates_with_direction: set[tuple[int, int, str]] = set()
+        guard_coordinates, guard_direction = self.guard_coordinates_and_direction()
+        new_guard_direction: str = guard_direction
+
+        # add obstacle to map temporarily
+        previous_value = self.map_data[obstacle_coordinates[1]
+                                       ][obstacle_coordinates[0]]
+        self.map_data[obstacle_coordinates[1]][obstacle_coordinates[0]] = '#'
+
+        while can_leave and not self.is_guard_leaving_map(guard_coordinates, guard_direction):
+            guard_direction = new_guard_direction
+
+            coordinates_before_next_obstacle = \
+                self.coordinates_before_next_obstacle(
+                    guard_coordinates, guard_direction)
+            if coordinates_before_next_obstacle != guard_coordinates and coordinates_before_next_obstacle + (guard_direction,) in visited_coordinates_with_direction:
+                # must be before adding to visited coordinates
+                can_leave = False
+            if coordinates_before_next_obstacle != guard_coordinates:
+                visited_coordinates_with_direction.add(
+                    coordinates_before_next_obstacle + (guard_direction,))
+
+            if guard_coordinates + (guard_direction,) in visited_coordinates_with_direction:
+                can_leave = False
+            visited_coordinates_with_direction.add(
+                guard_coordinates + (guard_direction,))
+
+            coordinates_between = self.coordinates_between_two_points(guard_coordinates,
+                                                                      coordinates_before_next_obstacle)
+            for coordinates in coordinates_between:
+                if coordinates + (guard_direction,) in visited_coordinates_with_direction:
+                    can_leave = False
+                visited_coordinates_with_direction.add(
+                    coordinates + (guard_direction,))
+
+            guard_coordinates = coordinates_before_next_obstacle
+            new_guard_direction = self.turn_guard_right(guard_direction)
+
+        # remove obstacle from map
+        self.map_data[obstacle_coordinates[1]][obstacle_coordinates[0]] = \
+            previous_value
+        return can_leave
+
+    def is_guard_looping(self, guard_coordinates: tuple[int, int], guard_direction: str, visited_coordinates: set[tuple[int, int]]) -> bool:
+        return guard_coordinates in visited_coordinates
 
 
 if __name__ == '__main__':
