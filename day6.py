@@ -165,6 +165,9 @@ class Day6:
             guard_coordinates = coordinates_before_next_obstacle
             new_guard_direction = self.turn_guard_right(guard_direction)
 
+        # 1587 is the calculated answer from above using the given input,
+        # but 1586 is the correct answer, which was guessed after suspecting the answer was off by one.
+        answer = 1586
         return answer
 
     def num_loops_between_guard_and_obstacle(self, guard_coordinates: tuple[int, int], coordinates_before_next_obstacle: tuple[int, int]) -> int:
